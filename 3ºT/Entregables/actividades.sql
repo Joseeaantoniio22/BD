@@ -216,21 +216,18 @@ BEGIN
 
 		DECLARE cursor05 CURSOR FOR 
 
-		SELECT nombre, apellido1, apellido2, ciudad
+		SELECT persona.nombre, persona.apellido1, persona.apellido2, persona.ciudad, persona.sexo
 		FROM persona
+		INNER JOIN alumno_se_matricula_asignatura ON persona.id=alumno_se_matricula_asignatura.id_alumno
+		INNER JOIN asignatura ON alumno_se_matricula_asignatura.id_asignatura=asignatura.id
+		WHERE asignatura.nombre = @nombre
 
 		OPEN cursor05;
 
-		FETCH NEXT FROM cursor05 INTO @nombreAlumno, @apellido1, @apellido2, @ciudad
+		FETCH NEXT FROM cursor05 INTO @nombreAlumno, @apellido1, @apellido2, @ciudad, @sexo
 
 		WHILE @@FETCH_STATUS = 0
-		BEGIN		
-			SET @sexo = (
-					SELECT sexo
-					FROM persona
-					WHERE nombre = @nombreAlumno
-			);
-			
+		BEGIN	
 			IF(@sexo = 'M')
 			BEGIN
 				PRINT(CONCAT('Alumna: ',@nombreAlumno,' ',@apellido1,' ',@apellido2,', Ciudad: ',@ciudad))
@@ -240,7 +237,7 @@ BEGIN
 				PRINT(CONCAT('Alumno: ',@nombreAlumno,' ',@apellido1,' ',@apellido2,', Ciudad: ',@ciudad))
 			END
 
-			FETCH NEXT FROM cursor05 INTO @nombreAlumno, @apellido1, @apellido2, @ciudad;
+			FETCH NEXT FROM cursor05 INTO @nombreAlumno, @apellido1, @apellido2, @ciudad, @sexo;
 		END;
 
 		CLOSE cursor05;
@@ -248,6 +245,7 @@ BEGIN
 	END
 
 END
+
 
 DECLARE @nombre NVARCHAR(100);
 set @nombre = 'Introducción a la programación';
@@ -268,14 +266,22 @@ BEGIN
 	)
 
 	SET @alumnosMatriculado = (
-		SELECT distinct persona.nombre
+		SELECT COUNT(persona.nombre)
 		FROM persona
 		INNER JOIN	alumno_se_matricula_asignatura ON persona.id=alumno_se_matricula_asignatura.id_alumno	
 		INNER JOIN asignatura ON alumno_se_matricula_asignatura.id_asignatura=asignatura.id
 		INNER JOIN grado ON asignatura.id_grado = grado.id
-		WHERE grado.nombre = 'Grado en Ingeniería Informática (Plan 2015)' 
+		WHERE grado.nombre = 'Grado en Ingeniería Informática (Plan 2015)'
+		GROUP BY persona.nombre
 	)
+
+	PRINT(@alumnosMatriculado)
 END
+
+DECLARE @nombre NVARCHAR(100);
+SET @nombre = 'Grado en Ingeniería Informática (Plan 2015)';
+EXEC ejercicio06EV @nombre;
+
 
 
 --Ejercicio07
@@ -355,3 +361,192 @@ SET @apellido1 = 'Ramirez';
 SET @apellido2 = 'Gea';
 
 EXEC ejercicio07EV @nombre, @apellido1, @apellido2;
+
+
+--EJERCICIO 01.2
+USE NBAv2;
+
+CREATE OR ALTER PROCEDURE ejercicio01_2
+@nombreEquipo NVARCHAR(100)
+AS
+BEGIN
+	DECLARE @hayEquipo INT;
+	SET @hayEquipo = (
+		SELECT COUNT(*)
+		FROM equipo
+		WHERE nombre = @nombreEquipo
+	)
+
+	DECLARE @ciudad NVARCHAR(100);
+	set @ciudad = (
+		SELECT ciudad
+		FROM equipo
+		WHERE nombre = @nombreEquipo
+	)
+
+	IF(@hayEquipo=0)
+	BEGIN
+		THROW 50001, 'El equipo no existe en la base de datos',1;
+		RETURN;
+	END
+	ELSE
+	BEGIN
+		PRINT('La ciudad del equipo '+@nombreEquipo+' es: '+@ciudad)
+	END
+END
+
+DECLARE @nombre NVARCHAR(100);
+SET @nombre = 'Lakers';
+EXEC ejercicio01_2 @nombre;
+
+--EJERCICIO 02
+CREATE OR ALTER PROCEDURE ejercicio02_2
+@nombre NVARCHAR(100),
+@temporada NVARCHAR(100)
+AS
+BEGIN 
+	DECLARE @hayEquipo INT;
+	set @hayEquipo=(
+		SELECT COUNT(*)
+		FROM equipo
+		WHERE nombre = @nombre
+	)
+
+	IF(@hayEquipo=0)
+	BEGIN
+		THROW 50001,'El equipo no existe en la base de datos',1;
+		RETURN;
+	END
+	ELSE
+	BEGIN
+		DECLARE @hayJugadores INT;
+		SET @hayJugadores = (
+			SELECT COUNT(*)
+			FROM jugador
+			INNER JOIN jugador_equipo ON jugador.codigo = jugador_equipo.codigo_jugador
+			INNER JOIN equipo ON jugador_equipo.codigo_equipo = equipo.codigo
+			WHERE jugador_equipo.temporada = @temporada AND equipo.nombre = @nombre
+		)
+		
+		IF(@hayJugadores=0)
+		BEGIN
+			PRINT('No hay jugadores del equipo '+@nombre+' en la temporada '+@temporada);
+		END
+		ELSE
+		BEGIN
+			PRINT('Jugadores del equipo '+@nombre+' en la temporada: '+@temporada);
+			PRINT('---------------------------------------------------------------');
+
+			DECLARE @nombreJugador NVARCHAR(100);
+			DECLARE c_02_2 CURSOR FOR
+			SELECT jugador.nombre
+			FROM jugador_equipo
+			INNER JOIN jugador ON jugador.codigo = jugador_equipo.codigo_jugador
+			INNER JOIN equipo ON jugador_equipo.codigo_equipo = equipo.codigo
+			WHERE temporada = @temporada AND equipo.nombre = @nombre;
+
+			OPEN c_02_2;
+
+			FETCH NEXT FROM c_02_2 INTO @nombreJugador;
+
+			WHILE @@FETCH_STATUS=0
+			BEGIN
+				PRINT('Nombre: '+@nombreJugador);
+				FETCH NEXT FROM c_02_2 INTO @nombreJugador;
+			END
+			CLOSE c_02_2;
+			DEALLOCATE c_02_2; 
+		END
+	END	
+END
+
+DECLARE @nombre NVARCHAR(100);
+DECLARE @temporada NVARCHAR(100);
+set @nombre = 'Lakers';
+SET @temporada = '2022-23';
+EXEC ejercicio02_2 @nombre, @temporada;
+
+--EJERCICIO 03
+CREATE OR ALTER PROCEDURE ejercicio03_2
+@nombre NVARCHAR(100),
+@temporada NVARCHAR(100),
+@posicion NVARCHAR(100)
+AS
+BEGIN 
+	DECLARE @hayEquipo INT;
+	set @hayEquipo=(
+		SELECT COUNT(*)
+		FROM equipo
+		WHERE nombre = @nombre
+	)
+
+	IF(@hayEquipo=0)
+	BEGIN
+		THROW 50001,'El equipo no existe en la base de datos',1;
+		RETURN;
+	END
+	ELSE
+	BEGIN
+		DECLARE @hayJugadores INT;
+		SET @hayJugadores = (
+			SELECT COUNT(*)
+			FROM jugador
+			INNER JOIN jugador_equipo ON jugador.codigo = jugador_equipo.codigo_jugador
+			INNER JOIN equipo ON jugador_equipo.codigo_equipo = equipo.codigo
+			WHERE jugador_equipo.temporada = @temporada AND equipo.nombre = @nombre
+		)
+		
+		IF(@hayJugadores=0)
+		BEGIN
+			PRINT('No hay jugadores del equipo '+@nombre+' en la temporada '+@temporada);
+		END
+		ELSE
+		BEGIN
+			DECLARE @hayPosicion INT;
+			SET @hayPosicion = (
+				SELECT COUNT(*)
+				FROM jugador
+				INNER JOIN jugador_equipo ON jugador.codigo = jugador_equipo.codigo_jugador
+				INNER JOIN equipo ON jugador_equipo.codigo_equipo = equipo.codigo
+				WHERE jugador_equipo.temporada = @temporada AND equipo.nombre = @nombre AND jugador_equipo.posicion = @posicion
+			)
+			IF(@hayPosicion=0)
+			BEGIN
+				PRINT('No hay jugadores en el equipo '+@nombre+' en la temporada '+@temporada+' que jueguen en la posición de '+@posicion);
+			END
+			ELSE
+			BEGIN
+				PRINT('Jugadores del equipo '+@nombre+' en la temporada: '+@temporada);
+				PRINT('---------------------------------------------------------------');
+
+				DECLARE @nombreJugador NVARCHAR(100);
+				DECLARE c_03_2 CURSOR FOR
+				SELECT jugador.nombre
+				FROM jugador
+				INNER JOIN jugador_equipo ON jugador.codigo = jugador_equipo.codigo_jugador
+				INNER JOIN equipo ON jugador_equipo.codigo_equipo = equipo.codigo
+				WHERE jugador_equipo.temporada = @temporada AND equipo.nombre = @nombre AND jugador_equipo.posicion = @posicion
+
+				OPEN c_03_2;
+
+				FETCH NEXT FROM c_03_2 INTO @nombreJugador;
+
+				WHILE @@FETCH_STATUS=0
+				BEGIN
+					PRINT(@nombreJugador);
+					FETCH NEXT FROM c_03_2 INTO @nombreJugador;
+				END
+				CLOSE c_03_2;
+				DEALLOCATE c_03_2;
+			END
+		END
+	END	
+END
+
+DECLARE @nombre NVARCHAR(100);
+DECLARE @temporada NVARCHAR(100);
+DECLARE @posicion NVARCHAR(100);
+set @nombre = 'Lakers';
+SET @posicion = 'Aleros';
+SET @temporada = '2022-23';
+EXEC ejercicio03_2 @nombre, @temporada, @posicion;
